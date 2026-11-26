@@ -94,7 +94,7 @@
     border:3px solid var(--win-edge); box-shadow: inset 0 0 0 2px var(--win-inner)}
   .banner.dup{display:block; background:linear-gradient(180deg,var(--warn-bg-hi),var(--warn-bg-lo)); color:#fff}
   .banner.ok{display:block; background:linear-gradient(180deg,#1d6b3c,#0f4423); color:#fff}
-  .controls{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:12px}
+  .controls{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px}
   .controls button{
     padding:11px 4px; border-radius:var(--radius); cursor:pointer;
     border:3px solid var(--win-edge);
@@ -143,6 +143,42 @@
     background:linear-gradient(180deg,var(--win-hi),var(--win-lo));
     box-shadow: inset 0 0 0 2px var(--win-inner); color:var(--danger);
   }
+  .stopbar{
+    display:block; width:100%; margin-top:12px; padding:14px 8px; cursor:pointer;
+    border-radius:var(--radius); border:3px solid var(--win-edge);
+    background:linear-gradient(180deg,#8c2b1d,#571a10);
+    box-shadow: inset 0 0 0 2px var(--win-inner), 0 4px 14px rgba(0,0,0,.45);
+    color:#fff; font-family:inherit; font-size:16px; font-weight:700;
+  }
+  .stopbar[hidden]{display:none}
+  .share-main{
+    display:block; width:100%; margin-top:10px; padding:14px 8px; cursor:pointer;
+    border-radius:var(--radius); border:3px solid var(--win-edge);
+    background:linear-gradient(180deg,#1d6b3c,#0f4423);
+    box-shadow: inset 0 0 0 2px var(--win-inner), 0 4px 14px rgba(0,0,0,.45);
+    color:#fff; font-family:inherit; font-size:16px; font-weight:700;
+  }
+  .sheet{position:fixed; inset:0; z-index:50; background:rgba(2,4,18,.62);
+    display:flex; align-items:flex-end; justify-content:center; padding:14px}
+  .sheet[hidden]{display:none}
+  .sheet-panel{width:100%; max-width:520px; padding:18px 16px 14px; border-radius:18px}
+  .sheet-panel h3{margin:0 0 4px; font-size:16px; text-shadow:0 2px 0 rgba(0,0,0,.45)}
+  .sheet-panel p{margin:0 0 14px; font-size:13px; color:var(--txt-dim)}
+  .sheet-do{
+    display:block; width:100%; padding:20px 10px; cursor:pointer; border-radius:14px;
+    background:linear-gradient(180deg,var(--gold),var(--gold-lo)); color:#231a02;
+    border:3px solid #fff3cf; box-shadow:0 4px 12px rgba(0,0,0,.45);
+    font-family:inherit; font-size:20px; font-weight:700;
+  }
+  .sheet-sc{
+    display:block; width:100%; margin-top:10px; padding:13px 10px; cursor:pointer; border-radius:14px;
+    border:3px solid var(--win-edge);
+    background:linear-gradient(180deg,var(--win-hi),var(--win-lo));
+    box-shadow: inset 0 0 0 2px var(--win-inner);
+    color:#fff; font-family:inherit; font-size:15px; font-weight:600;
+  }
+  .sheet-cancel{display:block; margin:12px auto 2px; background:none; border:0; cursor:pointer;
+    color:var(--txt-dim); font-family:inherit; font-size:14px; padding:6px 14px}
   footer{color:var(--txt-dim); font-size:13px; text-align:center; margin-top:22px}
 </style>
 </head>
@@ -170,14 +206,14 @@
       <div style="font-size:13px;color:var(--txt-dim)">เบราว์เซอร์จะถามขออนุญาตใช้กล้อง — กด “อนุญาต” ได้เลย</div>
     </div>
   </div>
-  <p class="status" id="status">กำลังเตรียมกล้อง…</p>
+  <button id="stopBtn" class="stopbar" type="button" hidden>ปิดกล้อง — ประหยัดแบต</button>
+  <p class="status" id="status">กดปุ่ม “เปิดกล้องสแกน” เพื่อเริ่มสแกน</p>
   <div class="banner" id="banner" role="alert"></div>
 
   <div class="controls">
     <button id="torchBtn" type="button" disabled>ไฟฉาย</button>
     <button id="switchBtn" type="button" disabled>สลับกล้อง</button>
     <button id="photoBtn" type="button">ถ่ายรูปป้าย</button>
-    <button id="stopBtn" type="button" disabled>ปิดกล้อง</button>
   </div>
   <input id="photoInput" type="file" accept="image/*" capture="environment" hidden>
 
@@ -195,6 +231,18 @@
   <div class="actions">
     <button class="copy" id="copyBtn" type="button">คัดลอกเลขทั้งหมด</button>
     <button class="clear" id="clearBtn" type="button">ล้างรายการ</button>
+  </div>
+
+  <button class="share-main" id="shareBtn" type="button">แชร์ข้อความ</button>
+
+  <div class="sheet" id="shareSheet" hidden>
+    <div class="win sheet-panel">
+      <h3>แชร์ไป WhatsApp</h3>
+      <p id="shareInfo">เลือกประเภทงานของรายการนี้</p>
+      <button class="sheet-do" id="shareDO" type="button">1. Drop-off (DO)</button>
+      <button class="sheet-sc" id="shareSC" type="button">2. SC — ลูกค้ามารับเอง</button>
+      <button class="sheet-cancel" id="shareCancel" type="button">ยกเลิก</button>
+    </div>
   </div>
 
   <footer>ต้นแบบทดสอบกล้องสด — เปิดหน้านี้ใน Chrome บนมือถือโดยตรง<br>เลขที่สแกนเก็บอยู่ในเครื่องนี้เท่านั้น (localStorage)</footer>
@@ -313,7 +361,7 @@ async function startCamera() {
   video.srcObject = stream;
   track = stream.getVideoTracks()[0] || null;
   $('offOverlay').style.display = 'none';
-  $('stopBtn').disabled = false; $('switchBtn').disabled = false;
+  $('stopBtn').hidden = false; $('switchBtn').disabled = false;
   try {
     const caps = track && track.getCapabilities ? track.getCapabilities() : null;
     $('torchBtn').disabled = !(caps && caps.torch);
@@ -331,7 +379,7 @@ function stopCamera() {
   scanning = false;
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; track = null; }
   video.srcObject = null;
-  $('stopBtn').disabled = true; $('switchBtn').disabled = true; $('torchBtn').disabled = true;
+  $('stopBtn').hidden = true; $('switchBtn').disabled = true; $('torchBtn').disabled = true;
   $('offOverlay').style.display = 'flex';
 }
 async function detectLoop() {
@@ -393,6 +441,21 @@ $('clearBtn').addEventListener('click', () => {
   if (!items.length) return;
   if (confirm('ล้างรายการทั้งหมด ' + items.length + ' เลข?')) { items = []; save(); render(); setStatus('ล้างรายการแล้ว'); }
 });
+function shareViaWhatsApp(kind) {
+  // ข้อความแถมบรรทัดบนสุดของข้อความที่แชร์: "DO" หรือ "SC" แล้วตามด้วยเลขพัสดุบรรทัดละเลข
+  const text = kind + '\n' + items.join('\n');
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  $('shareSheet').hidden = true;
+}
+$('shareBtn').addEventListener('click', () => {
+  if (!items.length) { setStatus('ยังไม่มีเลขให้แชร์ — สแกนก่อนนะ', true); return; }
+  $('shareInfo').textContent = 'รายการ ' + items.length + ' เลข — เลือกประเภทงานของรายการนี้';
+  $('shareSheet').hidden = false;
+});
+$('shareDO').addEventListener('click', () => shareViaWhatsApp('DO'));
+$('shareSC').addEventListener('click', () => shareViaWhatsApp('SC'));
+$('shareCancel').addEventListener('click', () => { $('shareSheet').hidden = true; });
+$('shareSheet').addEventListener('click', (ev) => { if (ev.target === $('shareSheet')) $('shareSheet').hidden = true; });
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState === 'visible' && scanning && wakeLock === null) {
     try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
@@ -400,7 +463,6 @@ document.addEventListener('visibilitychange', async () => {
 });
 
 render();
-startCamera();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }

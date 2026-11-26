@@ -1,7 +1,7 @@
 // SPX Scanner — service worker: cache เฉพาะตัวหน้าเว็บ (app shell) เท่านั้น
 // ข้อมูลชุดสแกนอยู่ใน localStorage ของเบราว์เซอร์ ไม่ผ่าน service worker นี้
-// v2: เปลี่ยนชื่อ cache เพื่อล้าง shell ของบิลด์เก่า (activate จะลบ cache ชื่ออื่นทิ้งทั้งหมด)
-const CACHE = 'spx-scanner-v2';
+// v3: ล้าง shell รอบแก้ UX (กล้องไม่เปิดเอง / ปุ่มปิดกล้อง / ปุ่มแชร์)
+const CACHE = 'spx-scanner-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', (e) => {
