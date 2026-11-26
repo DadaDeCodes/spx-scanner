@@ -1,6 +1,7 @@
 // SPX Scanner — service worker: cache เฉพาะตัวหน้าเว็บ (app shell) เท่านั้น
 // ข้อมูลชุดสแกนอยู่ใน localStorage ของเบราว์เซอร์ ไม่ผ่าน service worker นี้
-const CACHE = 'spx-scanner-v1';
+// v2: เปลี่ยนชื่อ cache เพื่อล้าง shell ของบิลด์เก่า (activate จะลบ cache ชื่ออื่นทิ้งทั้งหมด)
+const CACHE = 'spx-scanner-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -17,7 +18,7 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== location.origin) return; // ไฟล์นอก origin (ฟอนต์/CDN) ปล่อยผ่านปกติ
+  if (e.request.method !== 'GET' || url.origin !== location.origin) return; // ไฟล์นอก origin ปล่อยผ่านปกติ
   e.respondWith(
     fetch(e.request)
       .then((res) => {
