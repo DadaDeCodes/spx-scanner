@@ -1,7 +1,7 @@
 // SPX Scanner — service worker: cache เฉพาะตัวหน้าเว็บ (app shell) เท่านั้น
 // ข้อมูลชุดสแกนอยู่ใน localStorage ของเบราว์เซอร์ ไม่ผ่าน service worker นี้
-// v4: เพิ่มช่องกรอกเบอร์ WhatsApp ปลายทาง (เก็บในเครื่องเท่านั้น)
-const CACHE = 'spx-scanner-v4';
+// v5: กรองโค้ดที่ไม่ใช่เลขพัสดุ (เสียงเตือนเฉพาะ + ไม่บันทึกลงรายการ)
+const CACHE = 'spx-scanner-v5';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', (e) => {

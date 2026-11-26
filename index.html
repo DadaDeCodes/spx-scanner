@@ -79,6 +79,7 @@
   .frame i.br{right:0; bottom:0; border-right-width:4px; border-bottom-width:4px; border-bottom-right-radius:8px}
   .stage.flash-ok{outline:4px solid var(--ok); outline-offset:-4px}
   .stage.flash-dup{outline:4px solid var(--gold); outline-offset:-4px}
+  .stage.flash-bad{outline:4px solid #f87171; outline-offset:-4px}
   .stage .off{position:absolute; inset:0; display:flex; flex-direction:column; gap:12px;
     align-items:center; justify-content:center; color:var(--txt); text-align:center; padding:16px;
     background:linear-gradient(180deg,var(--win-hi),var(--win-lo))}
@@ -94,6 +95,7 @@
     border:3px solid var(--win-edge); box-shadow: inset 0 0 0 2px var(--win-inner)}
   .banner.dup{display:block; background:linear-gradient(180deg,var(--warn-bg-hi),var(--warn-bg-lo)); color:#fff}
   .banner.ok{display:block; background:linear-gradient(180deg,#1d6b3c,#0f4423); color:#fff}
+  .banner.bad{display:block; background:linear-gradient(180deg,#8c2b1d,#571a10); color:#fff}
   .controls{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px}
   .controls button{
     padding:11px 4px; border-radius:var(--radius); cursor:pointer;
@@ -130,6 +132,11 @@
   ol#items .no{color:var(--gold); font-size:13px; min-width:22px; font-weight:700}
   ol#items .code{flex:1; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:15px; word-break:break-all}
   ol#items .del{border:0; background:none; color:var(--danger); font-size:18px; cursor:pointer; padding:2px 6px}
+  ol#items li.spxth{border-color:var(--gold)}
+  ol#items .tag{font-size:11px; font-weight:700; color:#231a02; white-space:nowrap;
+    background:linear-gradient(180deg,var(--gold),var(--gold-lo)); border-radius:6px; padding:2px 7px}
+  #spxthNote{margin:0 2px 8px; font-size:14px; font-weight:600; color:var(--gold)}
+  #spxthNote[hidden]{display:none}
   .empty{color:var(--txt-dim); text-align:center; padding:18px 12px;
     border:3px dashed rgba(238,241,255,.45); border-radius:var(--radius); background:rgba(0,0,0,.22)}
   .actions{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px}
@@ -241,6 +248,7 @@
   <div class="listhead">
     <h2 id="listTitle">รายการที่สแกน (DO)</h2>
   </div>
+  <div id="spxthNote" hidden></div>
   <ol id="items"></ol>
   <div class="empty" id="emptyMsg">ยังไม่มีเลขพัสดุ — เริ่มสแกนได้เลย</div>
 
@@ -297,25 +305,25 @@ if ('BarcodeDetector' in window) {
 
 function save() { try { localStorage.setItem(LS_KEY, JSON.stringify({ mode, items })); } catch (e) {} }
 function setStatus(msg, isErr) { statusEl.textContent = msg; statusEl.classList.toggle('err', !!isErr); }
-function showBanner(kind, msg) {
+function showBanner(kind, msg, dur) {
   banner.className = 'banner ' + kind; banner.textContent = msg;
   clearTimeout(showBanner._t);
-  showBanner._t = setTimeout(() => { banner.className = 'banner'; }, 2600);
+  showBanner._t = setTimeout(() => { banner.className = 'banner'; }, dur || 2600);
 }
 function flash(kind) {
-  stage.classList.remove('flash-ok','flash-dup'); void stage.offsetWidth;
-  stage.classList.add(kind === 'ok' ? 'flash-ok' : 'flash-dup');
-  setTimeout(() => stage.classList.remove('flash-ok','flash-dup'), 350);
+  stage.classList.remove('flash-ok','flash-dup','flash-bad'); void stage.offsetWidth;
+  stage.classList.add(kind === 'ok' ? 'flash-ok' : kind === 'bad' ? 'flash-bad' : 'flash-dup');
+  setTimeout(() => stage.classList.remove('flash-ok','flash-dup','flash-bad'), 350);
 }
 
 /* ---------- เสียง + เสียงพูด ---------- */
 let audioCtx = null;
-function beep(freq, dur, delay) {
+function beep(freq, dur, delay, type) {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     const t = audioCtx.currentTime + (delay || 0);
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.frequency.value = freq; o.type = 'sine';
+    o.frequency.value = freq; o.type = type || 'sine';
     g.gain.setValueAtTime(0.15, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + dur);
   } catch (e) {}
@@ -342,13 +350,54 @@ function render() {
     const del = document.createElement('button'); del.className = 'del'; del.type = 'button';
     del.textContent = '✕'; del.setAttribute('aria-label', 'ลบ ' + code);
     del.addEventListener('click', () => { items.splice(i, 1); save(); render(); });
-    li.append(no, c, del); ol.appendChild(li);
+    li.append(no, c);
+    if (isSpxth(code)) {
+      li.classList.add('spxth');
+      const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = 'SPXTH แยกรอบ';
+      li.appendChild(tag);
+    }
+    li.appendChild(del); ol.appendChild(li);
   });
+  const nSpxth = items.filter(isSpxth).length;
+  const note = $('spxthNote');
+  if (nSpxth && mode === 'DO') {
+    note.hidden = false;
+    note.textContent = '⚠ มี SPXTH ' + nSpxth + ' ชิ้น — แยกไปทำ DO รอบแยกทีหลัง จัดการชิ้นปกติก่อน';
+  } else if (nSpxth) {
+    note.hidden = false;
+    note.textContent = 'มี SPXTH ' + nSpxth + ' ชิ้นในรายการ';
+  } else {
+    note.hidden = true;
+  }
   $('emptyMsg').style.display = items.length ? 'none' : 'block';
 }
-function addCode(raw) {
-  const code = String(raw || '').trim();
+/* รูปแบบเลขพัสดุที่รับ (บรีฟจากบาส 2026-11-26):
+   - SPX มาตรฐาน (Shopee + Walk-in): TH + ตัวเลข 11–12 หลัก + ตัวอักษร/ตัวเลขปิดท้าย 1 ตัว
+     (เช่น TH2673972263877, TH267397226387S, TH06739702135B) และรูปแบบ SPXTH + โครงเดียวกัน
+   - J&T TikTok Shop: JTTH + ตัวเลข 12 หลัก
+   - J&T ตัวเลขล้วน 12 หลัก: ขึ้นต้น 62 (Shopee) / 82 (งานทั่วไป-สร้างเอง) / 86 (งานทั่วไป-หน้าร้าน) / 91 (Drop-off / e-Commerce อื่น)
+   โค้ดนอกเหนือจากนี้ (เช่น ขึ้นต้น 26...) = ไม่ใช่เลขพัสดุ ข้ามไปพร้อมเสียงเตือนเฉพาะ */
+const PARCEL_RES = [
+  /^TH[0-9]{11,12}[0-9A-Z]$/,
+  /^SPXTH[0-9]{11,12}[0-9A-Z]$/,
+  /^JTTH[0-9]{12}$/,
+  /^(62|82|86|91)[0-9]{10}$/
+];
+function isParcelCode(code) { return PARCEL_RES.some((r) => r.test(code)); }
+function isSpxth(code) { return code.indexOf('SPXTH') === 0; }
+let lastBad = '', lastBadTime = 0;
+function rejectCode(code) {
+  const now = Date.now();
+  if (code === lastBad && now - lastBadTime < 6000) return; // โค้ดเดิมค้างในกรอบ ไม่ต้องเตือนรัว
+  lastBad = code; lastBadTime = now;
+  flash('bad');
+  beep(170, 0.14, 0, 'square'); beep(170, 0.14, 0.2, 'square');
+  showBanner('bad', 'ไม่ใช่เลขพัสดุ — ข้ามไป: ' + code);
+}
+function addCode(raw, fromScan) {
+  const code = String(raw || '').trim().toUpperCase();
   if (!code) return;
+  if (fromScan && !isParcelCode(code)) { rejectCode(code); return; }
   const now = Date.now();
   if (code === lastCode && now - lastTime < 2500) return; // กัน detect ซ้ำรัว ๆ จากเฟรมติดกัน
   lastCode = code; lastTime = now;
@@ -360,7 +409,12 @@ function addCode(raw) {
   items.push(code); save(); render();
   flash('ok'); beep(880, 0.09, 0);
   if (navigator.vibrate) navigator.vibrate(60);
-  showBanner('ok', 'เพิ่มแล้ว: ' + code);
+  if (isSpxth(code) && mode === 'DO') {
+    // SPXTH ในงาน DO: ผู้ขายบางรายซื้อ API คีย์เอง ระบบอาจถามขนาด/น้ำหนักเพิ่ม — แยกรอบไปจัดการทีหลัง
+    showBanner('dup', 'พบ SPXTH ให้ระวัง — แยกรอบเพื่อจัดการชิ้นปกติให้เรียบร้อยก่อน ไม่เสียเวลา เอา SPXTH มาจัดการแยกทีหลัง', 6000);
+  } else {
+    showBanner('ok', 'เพิ่มแล้ว: ' + code);
+  }
 }
 
 /* ---------- กล้อง ---------- */
@@ -413,7 +467,7 @@ async function detectLoop() {
     if (video.readyState >= 2 && detector) {
       try {
         const codes = await detector.detect(video);
-        if (codes && codes.length && codes[0].rawValue) addCode(codes[0].rawValue);
+        if (codes && codes.length && codes[0].rawValue) addCode(codes[0].rawValue, true);
       } catch (e) {}
     }
     await new Promise(r => setTimeout(r, 180));
@@ -440,7 +494,7 @@ $('photoInput').addEventListener('change', async (ev) => {
   try {
     const bmp = await createImageBitmap(file);
     const codes = await detector.detect(bmp);
-    if (codes && codes.length && codes[0].rawValue) addCode(codes[0].rawValue);
+    if (codes && codes.length && codes[0].rawValue) addCode(codes[0].rawValue, true);
     else setStatus('อ่านโค้ดจากรูปไม่ได้ — ลองถ่ายให้ชัด/ใกล้กว่านี้ หรือพิมพ์เลขเอง', true);
   } catch (e) { setStatus('อ่านรูปไม่สำเร็จ', true); }
 });
@@ -453,7 +507,7 @@ $('modeDO').addEventListener('click', () => { mode = 'DO'; save(); render(); });
 $('modeSC').addEventListener('click', () => { mode = 'SC'; save(); render(); });
 $('copyBtn').addEventListener('click', async () => {
   if (!items.length) { setStatus('ยังไม่มีเลขให้คัดลอก', true); return; }
-  const text = items.join('\n');
+  const text = groupedItems(mode).join('\n');
   try { await navigator.clipboard.writeText(text); showBanner('ok', 'คัดลอก ' + items.length + ' เลขแล้ว — เอาไปวางส่งให้ Muse ได้เลย'); }
   catch (e) {
     const ta = document.createElement('textarea');
@@ -498,9 +552,17 @@ $('waDelete').addEventListener('click', () => {
   refreshWaUI();
   showBanner('ok', 'ลบเบอร์ที่บันทึกไว้ออกจากเครื่องนี้แล้ว');
 });
+function groupedItems(forKind) {
+  // งาน DO: ดึง SPXTH ไปไว้ท้ายกลุ่ม มีหัวข้อคั่น — จะได้แยกไปทำรอบแยกทีหลังง่าย
+  const spxth = items.filter(isSpxth);
+  if (forKind === 'DO' && spxth.length) {
+    return items.filter((c) => !isSpxth(c)).concat(['SPXTH (แยกรอบ)'], spxth);
+  }
+  return items.slice();
+}
 function shareViaWhatsApp(kind) {
   // ข้อความแถมบรรทัดบนสุดของข้อความที่แชร์: "DO" หรือ "SC" แล้วตามด้วยเลขพัสดุบรรทัดละเลข
-  const text = kind + '\n' + items.join('\n');
+  const text = kind + '\n' + groupedItems(kind).join('\n');
   const num = getWaNumber();
   const base = num ? 'https://wa.me/' + num : 'https://wa.me/';
   window.open(base + '?text=' + encodeURIComponent(text), '_blank');
