@@ -179,6 +179,22 @@
   }
   .sheet-cancel{display:block; margin:12px auto 2px; background:none; border:0; cursor:pointer;
     color:var(--txt-dim); font-family:inherit; font-size:14px; padding:6px 14px}
+  .wa-label{display:block; font-size:14px; font-weight:600; margin-bottom:6px}
+  .wa-input{
+    width:100%; padding:12px; border-radius:var(--radius); font-family:inherit; font-size:17px;
+    border:3px solid var(--win-edge); box-shadow: inset 0 0 0 2px var(--win-inner);
+    background:rgba(0,0,0,.35); color:#fff; letter-spacing:1px;
+  }
+  .wa-save{
+    display:block; width:100%; margin-top:10px; padding:13px 10px; cursor:pointer; border-radius:var(--radius);
+    background:linear-gradient(180deg,var(--gold),var(--gold-lo)); color:#231a02;
+    border:2px solid #fff3cf; font-family:inherit; font-size:16px; font-weight:700;
+  }
+  .wa-note{font-size:12px; color:var(--txt-dim); margin-top:8px}
+  .wa-dest{font-size:14px; margin:0 0 12px; color:#fff}
+  .wa-edit,.wa-del{background:none; border:0; cursor:pointer; font-family:inherit; font-size:13px;
+    color:var(--gold); text-decoration:underline; padding:2px 4px}
+  .wa-del{color:var(--danger)}
   footer{color:var(--txt-dim); font-size:13px; text-align:center; margin-top:22px}
 </style>
 </head>
@@ -239,8 +255,18 @@
     <div class="win sheet-panel">
       <h3>แชร์ไป WhatsApp</h3>
       <p id="shareInfo">เลือกประเภทงานของรายการนี้</p>
-      <button class="sheet-do" id="shareDO" type="button">1. Drop-off (DO)</button>
-      <button class="sheet-sc" id="shareSC" type="button">2. SC — ลูกค้ามารับเอง</button>
+      <div id="waSetup">
+        <label class="wa-label" for="waInput">เบอร์ WhatsApp ปลายทาง (แชทของ Muse)</label>
+        <input class="wa-input" id="waInput" type="tel" inputmode="numeric" autocomplete="off" placeholder="เช่น 0812345678">
+        <button class="wa-save" id="waSave" type="button">บันทึกเบอร์ — ส่งตรงเข้าแชทนี้</button>
+        <div class="wa-note">เบอร์เก็บอยู่ในมือถือเครื่องนี้เท่านั้น ไม่เขียนลงโค้ด ไม่ขึ้น repo — ลบออกเมื่อไหร่ก็ได้</div>
+        <button class="wa-del" id="waDelete" type="button" hidden>ลบเบอร์ที่บันทึกไว้</button>
+      </div>
+      <div id="waReady" hidden>
+        <p class="wa-dest">ปลายทาง: WhatsApp ••••<span id="waLast4"></span> <button class="wa-edit" id="waEdit" type="button">เปลี่ยนเบอร์</button></p>
+        <button class="sheet-do" id="shareDO" type="button">1. Drop-off (DO)</button>
+        <button class="sheet-sc" id="shareSC" type="button">2. SC — ลูกค้ามารับเอง</button>
+      </div>
       <button class="sheet-cancel" id="shareCancel" type="button">ยกเลิก</button>
     </div>
   </div>
@@ -441,15 +467,49 @@ $('clearBtn').addEventListener('click', () => {
   if (!items.length) return;
   if (confirm('ล้างรายการทั้งหมด ' + items.length + ' เลข?')) { items = []; save(); render(); setStatus('ล้างรายการแล้ว'); }
 });
+/* เบอร์ปลายทาง WhatsApp: เก็บใน localStorage ของเครื่องนี้เท่านั้น
+   ห้ามฝังเบอร์ลงโค้ดเด็ดขาด — repo เป็น public ใครก็อ่านซอร์สได้ */
+const WA_KEY = 'spxscan.waNumber.v1';
+function getWaNumber() { try { return localStorage.getItem(WA_KEY) || ''; } catch (e) { return ''; } }
+function normalizeWa(raw) {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.charAt(0) === '0') d = '66' + d.slice(1);
+  return (d.indexOf('66') === 0 && d.length === 11) ? d : '';
+}
+function refreshWaUI() {
+  const num = getWaNumber();
+  $('waSetup').hidden = !!num;
+  $('waReady').hidden = !num;
+  $('waDelete').hidden = !num;
+  if (num) $('waLast4').textContent = num.slice(-4);
+}
+$('waSave').addEventListener('click', () => {
+  const n = normalizeWa($('waInput').value);
+  if (!n) { setStatus('เบอร์ไม่ถูกต้อง — ใส่เบอร์มือถือไทย 10 หลัก เช่น 0812345678', true); return; }
+  try { localStorage.setItem(WA_KEY, n); } catch (e) {}
+  $('waInput').value = '';
+  refreshWaUI();
+  showBanner('ok', 'บันทึกเบอร์แล้ว — ต่อไปกด DO/SC ส่งตรงเข้าแชทนี้เลย');
+});
+$('waEdit').addEventListener('click', () => { $('waSetup').hidden = false; $('waReady').hidden = true; });
+$('waDelete').addEventListener('click', () => {
+  try { localStorage.removeItem(WA_KEY); } catch (e) {}
+  $('waInput').value = '';
+  refreshWaUI();
+  showBanner('ok', 'ลบเบอร์ที่บันทึกไว้ออกจากเครื่องนี้แล้ว');
+});
 function shareViaWhatsApp(kind) {
   // ข้อความแถมบรรทัดบนสุดของข้อความที่แชร์: "DO" หรือ "SC" แล้วตามด้วยเลขพัสดุบรรทัดละเลข
   const text = kind + '\n' + items.join('\n');
-  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  const num = getWaNumber();
+  const base = num ? 'https://wa.me/' + num : 'https://wa.me/';
+  window.open(base + '?text=' + encodeURIComponent(text), '_blank');
   $('shareSheet').hidden = true;
 }
 $('shareBtn').addEventListener('click', () => {
   if (!items.length) { setStatus('ยังไม่มีเลขให้แชร์ — สแกนก่อนนะ', true); return; }
   $('shareInfo').textContent = 'รายการ ' + items.length + ' เลข — เลือกประเภทงานของรายการนี้';
+  refreshWaUI();
   $('shareSheet').hidden = false;
 });
 $('shareDO').addEventListener('click', () => shareViaWhatsApp('DO'));
